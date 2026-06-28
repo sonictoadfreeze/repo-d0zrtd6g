@@ -248,7 +248,6 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
         }
 
         Spacer(Modifier.height(8.dp))
-        info?.announce?.let { AnnounceBanner(it) }
 
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             PowerButton(status = status) {
@@ -282,15 +281,6 @@ fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
         Column {
             Text(label, color = InkSubtext, fontSize = 12.sp)
             Text(value, color = InkText, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        }
-    }
-}
-
-@Composable
-fun AnnounceBanner(text: String) {
-    Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Text(text, color = InkSecondary, fontSize = 13.sp)
         }
     }
 }
