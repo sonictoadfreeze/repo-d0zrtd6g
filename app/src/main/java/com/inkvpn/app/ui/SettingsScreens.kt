@@ -1,6 +1,13 @@
 package com.inkvpn.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,13 +90,27 @@ fun SettingsScreen(vm: MainViewModel, activity: MainActivity) {
 
     BackHandler(enabled = page != SettingsPage.ROOT) { page = SettingsPage.ROOT }
 
-    when (page) {
-        SettingsPage.ROOT -> RootSettings(vm, activity, settings) { page = it }
-        SettingsPage.CONNECTION -> ConnectionSettings(vm, settings) { page = SettingsPage.ROOT }
-        SettingsPage.TUNNEL -> TunnelSettings(vm, settings) { page = SettingsPage.ROOT }
-        SettingsPage.PERAPP -> PerAppSettings(vm, settings) { page = SettingsPage.ROOT }
-        SettingsPage.THEME -> ThemeSettings(vm, settings) { page = SettingsPage.ROOT }
-        SettingsPage.LANGUAGE -> LanguageSettings(vm, settings) { page = SettingsPage.ROOT }
+    AnimatedContent(
+        targetState = page,
+        transitionSpec = {
+            if (targetState == SettingsPage.ROOT) {
+                (slideInHorizontally { -it / 4 } + fadeIn(tween(250)))
+                    .togetherWith(slideOutHorizontally { it / 4 } + fadeOut(tween(200)))
+            } else {
+                (slideInHorizontally { it / 4 } + fadeIn(tween(250)))
+                    .togetherWith(slideOutHorizontally { -it / 4 } + fadeOut(tween(200)))
+            }
+        },
+        label = "settings_page"
+    ) { animatedPage ->
+        when (animatedPage) {
+            SettingsPage.ROOT -> RootSettings(vm, activity, settings) { page = it }
+            SettingsPage.CONNECTION -> ConnectionSettings(vm, settings) { page = SettingsPage.ROOT }
+            SettingsPage.TUNNEL -> TunnelSettings(vm, settings) { page = SettingsPage.ROOT }
+            SettingsPage.PERAPP -> PerAppSettings(vm, settings) { page = SettingsPage.ROOT }
+            SettingsPage.THEME -> ThemeSettings(vm, settings) { page = SettingsPage.ROOT }
+            SettingsPage.LANGUAGE -> LanguageSettings(vm, settings) { page = SettingsPage.ROOT }
+        }
     }
 }
 

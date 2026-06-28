@@ -15,12 +15,17 @@ import com.inkvpn.app.core.Subscription
 import com.inkvpn.app.vpn.VpnController
 import com.inkvpn.app.vpn.VpnState
 import com.inkvpn.app.vpn.VpnStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.net.InetSocketAddress
+import java.net.Socket
 
 data class UiMessage(val text: String, val isError: Boolean = false)
 
@@ -51,6 +56,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var loading by mutableStateOf(false)
         private set
     var message by mutableStateOf<UiMessage?>(null)
+
+    private val _pings = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val pings: StateFlow<Map<String, Int>> = _pings
+
+    fun pingAllServers(servers: List<ServerConfig>) {
+        viewModelScope.launch {
+            servers.forEach { server ->
+                launch {
+                    val ms = measurePing(server.server, server.port)
+                    if (ms != null) {
+                        _pings.value = _pings.value + (server.id to ms)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun measurePing(host: String, port: Int): Int? = withContext(Dispatchers.IO) {
+        try {
+            val socket = Socket()
+            val start = System.currentTimeMillis()
+            socket.connect(InetSocketAddress(host, port), 3000)
+            val elapsed = (System.currentTimeMillis() - start).toInt()
+            socket.close()
+            elapsed
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     val allServers: List<ServerConfig>
         get() = subscriptions.value.flatMap { it.servers }
