@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.inkvpn.app.InkVpnApp
+import com.inkvpn.app.core.AppSettings
 import com.inkvpn.app.core.DeepLink
 import com.inkvpn.app.core.DeepLinkAction
 import com.inkvpn.app.core.ServerConfig
@@ -18,6 +19,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class UiMessage(val text: String, val isError: Boolean = false)
 
@@ -32,6 +35,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val activeServerId: StateFlow<String?> = VpnState.activeServerId
     val selectedServerId: StateFlow<String?> =
         repo.selectedServerId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val settings: StateFlow<AppSettings> =
+        repo.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettings())
+
+    private val settingsMutex = Mutex()
+
+    /** Apply a transform to the current settings and persist. */
+    fun updateSettings(transform: (AppSettings) -> AppSettings) {
+        viewModelScope.launch {
+            settingsMutex.withLock { repo.saveSettings(transform(repo.currentSettings())) }
+        }
+    }
 
     var loading by mutableStateOf(false)
         private set

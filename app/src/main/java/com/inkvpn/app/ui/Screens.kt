@@ -55,6 +55,7 @@ import com.inkvpn.app.core.Format
 import com.inkvpn.app.core.ServerConfig
 import com.inkvpn.app.core.Subscription
 import com.inkvpn.app.ui.theme.InkBackground
+import com.inkvpn.app.ui.theme.LocalAccent
 import com.inkvpn.app.ui.theme.InkDanger
 import com.inkvpn.app.ui.theme.InkPrimary
 import com.inkvpn.app.ui.theme.InkSecondary
@@ -74,6 +75,16 @@ fun InkVpnApp(vm: MainViewModel, activity: MainActivity) {
 
     val subs by vm.subscriptions.collectAsState()
     val deepLink by activity.pendingDeepLink
+    val status by vm.status.collectAsState()
+
+    var autoConnectTried by remember { mutableStateOf(false) }
+    LaunchedEffect(subs, showSplash) {
+        if (showSplash || autoConnectTried || subs.isEmpty()) return@LaunchedEffect
+        autoConnectTried = true
+        if (vm.settings.value.autoConnect && status == VpnStatus.DISCONNECTED) {
+            vm.selectedServer()?.let { activity.requestConnect(it) }
+        }
+    }
 
     var tab by remember { mutableStateOf(Tab.HOME) }
     var editTarget by remember { mutableStateOf<Subscription?>(null) }
@@ -106,7 +117,7 @@ fun InkVpnApp(vm: MainViewModel, activity: MainActivity) {
                             onAdd = { prefillUrl = ""; showAdd = true },
                             onEdit = { editTarget = it }
                         )
-                        Tab.SETTINGS -> SettingsScreen(activity)
+                        Tab.SETTINGS -> SettingsScreen(vm, activity)
                     }
                 }
             }
@@ -171,6 +182,7 @@ fun InkLogo(size: Int) {
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
+    val accent = LocalAccent.current.primary
     Row(
         Modifier.fillMaxWidth().background(InkSurfaceVariant.copy(alpha = 0.6f)).padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceAround
@@ -187,8 +199,8 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { onSelect(t) }.padding(horizontal = 8.dp)
             ) {
-                Icon(icon, contentDescription = t.title, tint = if (selected) InkPrimary else InkSubtext)
-                Text(t.title, color = if (selected) InkPrimary else InkSubtext, fontSize = 11.sp)
+                Icon(icon, contentDescription = t.title, tint = if (selected) accent else InkSubtext)
+                Text(t.title, color = if (selected) accent else InkSubtext, fontSize = 11.sp)
             }
         }
     }
@@ -289,14 +301,15 @@ fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
 fun PowerButton(status: VpnStatus, onClick: () -> Unit) {
     val connected = status == VpnStatus.CONNECTED
     val connecting = status == VpnStatus.CONNECTING
+    val accent = LocalAccent.current
     Box(contentAlignment = Alignment.Center) {
-        if (connected) PulseRing(size = 200.dp, color = InkSuccess)
+        if (connected) PulseRing(size = 200.dp, color = accent.accent)
         Box(
             Modifier
                 .size(160.dp)
                 .clip(CircleShape)
                 .background(
-                    if (connected) Brush.radialGradient(listOf(InkSuccess, InkSecondary))
+                    if (connected) Brush.radialGradient(listOf(accent.accent, accent.secondary))
                     else Brush.radialGradient(listOf(InkSurfaceVariant, InkSurfaceVariant))
                 )
                 .clickable { onClick() },
@@ -413,32 +426,6 @@ fun TrafficBar(used: Long, total: Long) {
     }
     Box(Modifier.fillMaxWidth().height(8.dp).padding(vertical = 2.dp).clip(RoundedCornerShape(50)).background(InkSurfaceVariant)) {
         Box(Modifier.fillMaxWidth(pct).height(8.dp).clip(RoundedCornerShape(50)).background(Brush.horizontalGradient(listOf(InkPrimary, color))))
-    }
-}
-
-// ---------------- SETTINGS ----------------
-
-@Composable
-fun SettingsScreen(activity: MainActivity) {
-    val hwid = remember { com.inkvpn.app.core.Hwid.generate(activity) }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Настройки", color = InkText, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-        Spacer(Modifier.height(12.dp))
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                Text("Идентификатор устройства (HWID)", color = InkText, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text(com.inkvpn.app.core.Hwid.shortId(hwid), color = InkSecondary, fontSize = 13.sp)
-                Text("Генерируется из аппаратных характеристик устройства", color = InkSubtext, fontSize = 11.sp)
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                Text("О приложении", color = InkText, fontWeight = FontWeight.SemiBold)
-                Text("InkVPN 1.0.0 • ядро sing-box", color = InkSubtext, fontSize = 12.sp)
-            }
-        }
     }
 }
 

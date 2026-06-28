@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.inkvpn.app.core.AppSettings
 import com.inkvpn.app.core.DeepLink
 import com.inkvpn.app.core.Subscription
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,19 @@ class Repository(private val context: Context) {
 
     private val SUBS = stringPreferencesKey("subscriptions")
     private val SELECTED = stringPreferencesKey("selected_server")
+    private val SETTINGS = stringPreferencesKey("app_settings")
+
+    val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
+        prefs[SETTINGS]?.let {
+            runCatching { json.decodeFromString(AppSettings.serializer(), it) }.getOrNull()
+        } ?: AppSettings()
+    }
+
+    suspend fun currentSettings(): AppSettings = settings.first()
+
+    suspend fun saveSettings(s: AppSettings) {
+        context.dataStore.edit { it[SETTINGS] = json.encodeToString(AppSettings.serializer(), s) }
+    }
 
     val subscriptions: Flow<List<Subscription>> = context.dataStore.data.map { prefs ->
         prefs[SUBS]?.let {
@@ -31,6 +45,8 @@ class Repository(private val context: Context) {
     }
 
     val selectedServerId: Flow<String?> = context.dataStore.data.map { it[SELECTED] }
+
+    suspend fun selectedServerId(): String? = selectedServerId.first()
 
     suspend fun setSelectedServer(id: String) {
         context.dataStore.edit { it[SELECTED] = id }

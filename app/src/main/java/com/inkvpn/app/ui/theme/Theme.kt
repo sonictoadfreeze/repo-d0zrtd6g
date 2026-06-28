@@ -1,10 +1,12 @@
 package com.inkvpn.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.inkvpn.app.core.ThemeChoice
 
 // InkVPN palette (dark OLED + cyberpunk)
 val InkBackground = Color(0xFF0A0E1A)
@@ -18,27 +20,34 @@ val InkDanger = Color(0xFFFF4757)
 val InkText = Color(0xFFE2E8F0)
 val InkSubtext = Color(0xFF64748B)
 
-private val InkColorScheme = darkColorScheme(
-    primary = InkPrimary,
-    secondary = InkSecondary,
-    tertiary = InkSuccess,
-    background = InkBackground,
-    surface = InkSurface,
-    surfaceVariant = InkSurfaceVariant,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = InkText,
-    onSurface = InkText,
-    error = InkDanger,
-)
+/** Accent colors that switch with the selected [ThemeChoice]. */
+data class InkAccent(val primary: Color, val secondary: Color, val accent: Color)
+
+val LocalAccent = staticCompositionLocalOf { accentFor(ThemeChoice.GREEN) }
+
+fun accentFor(theme: ThemeChoice): InkAccent = when (theme) {
+    ThemeChoice.GREEN -> InkAccent(Color(0xFF00C853), Color(0xFF69F0AE), Color(0xFF00FF88))
+    ThemeChoice.INDIGO -> InkAccent(InkPrimary, InkSecondary, InkSuccess)
+    ThemeChoice.CYAN -> InkAccent(Color(0xFF00B8D4), Color(0xFF18FFFF), Color(0xFF00E5FF))
+}
 
 @Composable
-fun InkVPNTheme(content: @Composable () -> Unit) {
-    @Suppress("UNUSED_EXPRESSION")
-    isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = InkColorScheme,
-        typography = InkTypography,
-        content = content,
+fun InkVPNTheme(theme: ThemeChoice = ThemeChoice.GREEN, content: @Composable () -> Unit) {
+    val accent = accentFor(theme)
+    val scheme = darkColorScheme(
+        primary = accent.primary,
+        secondary = accent.secondary,
+        tertiary = accent.accent,
+        background = InkBackground,
+        surface = InkSurface,
+        surfaceVariant = InkSurfaceVariant,
+        onPrimary = Color.White,
+        onSecondary = Color.White,
+        onBackground = InkText,
+        onSurface = InkText,
+        error = InkDanger,
     )
+    CompositionLocalProvider(LocalAccent provides accent) {
+        MaterialTheme(colorScheme = scheme, typography = InkTypography, content = content)
+    }
 }

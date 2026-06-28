@@ -31,10 +31,27 @@ class InkVpnService : VpnService(), PlatformInterface {
     companion object {
         const val ACTION_START = "com.inkvpn.app.START"
         const val ACTION_STOP = "com.inkvpn.app.STOP"
-        const val EXTRA_CONFIG = "config"
+        const val EXTRA_OUTBOUND = "outbound"
         const val EXTRA_SERVER_ID = "server_id"
         private const val CHANNEL_ID = "inkvpn_vpn"
         private const val NOTIF_ID = 0x1A11
+
+        // RFC1918 + link-local, excluded from the tunnel when "allow LAN" is on (API 33+).
+        private val PRIVATE_RANGES = listOf(
+            "10.0.0.0" to 8, "172.16.0.0" to 12, "192.168.0.0" to 16, "169.254.0.0" to 16,
+        )
+
+        // IPv4 space minus the private ranges above (for API < 33 which lacks excludeRoute).
+        private val PUBLIC_ROUTES = listOf(
+            "0.0.0.0" to 5, "8.0.0.0" to 7, "11.0.0.0" to 8, "12.0.0.0" to 6,
+            "16.0.0.0" to 4, "32.0.0.0" to 3, "64.0.0.0" to 2, "128.0.0.0" to 3,
+            "160.0.0.0" to 5, "168.0.0.0" to 6, "172.0.0.0" to 12, "172.32.0.0" to 11,
+            "172.64.0.0" to 10, "172.128.0.0" to 9, "173.0.0.0" to 8, "174.0.0.0" to 7,
+            "176.0.0.0" to 4, "192.0.0.0" to 9, "192.128.0.0" to 11, "192.160.0.0" to 13,
+            "192.169.0.0" to 16, "192.170.0.0" to 15, "192.172.0.0" to 14, "192.176.0.0" to 12,
+            "192.192.0.0" to 10, "193.0.0.0" to 8, "194.0.0.0" to 7, "196.0.0.0" to 6,
+            "200.0.0.0" to 5, "208.0.0.0" to 4,
+        )
     }
 
     private var boxService: BoxService? = null
@@ -43,22 +60,25 @@ class InkVpnService : VpnService(), PlatformInterface {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var interfaceListener: InterfaceUpdateListener? = null
     private val asyncExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    // Loaded before libbox starts; read (Java-only, no cgo reentry) inside openTun.
+    @Volatile private var settings: com.inkvpn.app.core.AppSettings = com.inkvpn.app.core.AppSettings()
     @Volatile private var running = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> { stopVpn(); return START_NOT_STICKY }
             else -> {
-                val config = intent?.getStringExtra(EXTRA_CONFIG)
+                val outbound = intent?.getStringExtra(EXTRA_OUTBOUND)
                 val serverId = intent?.getStringExtra(EXTRA_SERVER_ID)
-                if (config.isNullOrBlank()) { stopSelf(); return START_NOT_STICKY }
-                startVpn(config, serverId)
+                if (outbound.isNullOrBlank()) { stopSelf(); return START_NOT_STICKY }
+                startVpn(outbound, serverId)
             }
         }
         return START_STICKY
     }
 
-    private fun startVpn(config: String, serverId: String?) {
+    private fun startVpn(outbound: String, serverId: String?) {
         if (running) return
         running = true
         VpnState.setActiveServer(serverId)
@@ -68,6 +88,10 @@ class InkVpnService : VpnService(), PlatformInterface {
         // a small thread stack trips "stack split at bad time".
         Thread(null, {
             try {
+                val repo = (application as com.inkvpn.app.InkVpnApp).repository
+                settings = kotlinx.coroutines.runBlocking { repo.currentSettings() }
+                if (settings.wakelock) acquireWakeLock()
+                val config = BoxConfigBuilder.build(outbound, settings)
                 registerNetworkCallback()
                 val opts = SetupOptions().apply {
                     basePath = filesDir.absolutePath
@@ -76,6 +100,7 @@ class InkVpnService : VpnService(), PlatformInterface {
                 }
                 java.io.File(opts.workingPath).mkdirs()
                 Libbox.setup(opts)
+                Libbox.setMemoryLimit(!settings.unlimitedMemory)
                 val service = Libbox.newService(config, this)
                 service.start()
                 boxService = service
@@ -89,12 +114,23 @@ class InkVpnService : VpnService(), PlatformInterface {
         }, "inkvpn-box", 16L * 1024 * 1024).start()
     }
 
+    private fun acquireWakeLock() {
+        runCatching {
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "InkVPN::tunnel").apply {
+                setReferenceCounted(false); acquire()
+            }
+        }
+    }
+
     private fun stopVpn() {
         running = false
         try { boxService?.close() } catch (_: Exception) {}
         boxService = null
         try { tunFd?.close() } catch (_: Exception) {}
         tunFd = null
+        runCatching { if (wakeLock?.isHeld == true) wakeLock?.release() }
+        wakeLock = null
         unregisterNetworkCallback()
         VpnState.setStatus(VpnStatus.DISCONNECTED)
         VpnState.setActiveServer(null)
@@ -115,16 +151,46 @@ class InkVpnService : VpnService(), PlatformInterface {
     // ---------------- PlatformInterface ----------------
 
     override fun openTun(options: TunOptions): Int {
-        // EXPERIMENT: do not read any libbox `options` field here. Each getter is a Java->Go
-        // re-entry while we are already inside a Go->Java callback, which can trip
-        // "stack split at bad time" on the amd64 build. Build the tun from fixed values that
-        // match BoxConfigBuilder's tun inbound.
+        // Do not read any libbox `options` field here: each getter is a Java->Go re-entry while
+        // already inside a Go->Java callback, which can trip "stack split at bad time" on amd64.
+        // We build the tun from fixed values matching BoxConfigBuilder, plus our own AppSettings
+        // (a plain Kotlin object loaded before start, so reading it involves no cgo reentry).
+        val s = settings
         val builder = Builder()
         builder.setSession("InkVPN")
         builder.setMtu(9000)
         builder.addAddress("172.19.0.1", 30)
-        builder.addRoute("0.0.0.0", 0)
-        builder.addDnsServer("1.1.1.1")
+
+        if (s.allowLan) {
+            // Route everything except RFC1918 private ranges so LAN traffic bypasses the tunnel.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                builder.addRoute("0.0.0.0", 0)
+                for ((ip, pfx) in PRIVATE_RANGES) {
+                    runCatching { builder.excludeRoute(android.net.IpPrefix(java.net.InetAddress.getByName(ip), pfx)) }
+                }
+            } else {
+                for ((ip, pfx) in PUBLIC_ROUTES) runCatching { builder.addRoute(ip, pfx) }
+            }
+        } else {
+            builder.addRoute("0.0.0.0", 0)
+        }
+
+        builder.addDnsServer(s.dns.ip)
+
+        // Per-app proxy selection.
+        when (s.perAppMode) {
+            com.inkvpn.app.core.PerAppMode.INCLUDE ->
+                s.perAppPackages.forEach { runCatching { builder.addAllowedApplication(it) } }
+            com.inkvpn.app.core.PerAppMode.EXCLUDE ->
+                s.perAppPackages.forEach { runCatching { builder.addDisallowedApplication(it) } }
+            com.inkvpn.app.core.PerAppMode.OFF -> {}
+        }
+        // Never route our own traffic through the tunnel (avoid a loop), unless an explicit
+        // include-list is in effect (then our package simply isn't in it).
+        if (s.perAppMode != com.inkvpn.app.core.PerAppMode.INCLUDE) {
+            runCatching { builder.addDisallowedApplication(packageName) }
+        }
+
         builder.setBlocking(false)
         val pfd = builder.establish() ?: error("VpnService.Builder.establish() returned null")
         tunFd = pfd

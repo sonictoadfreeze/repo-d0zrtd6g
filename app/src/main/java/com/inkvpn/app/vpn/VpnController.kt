@@ -12,15 +12,16 @@ object VpnController {
     fun prepare(context: Context): Intent? = VpnService.prepare(context)
 
     fun start(context: Context, server: ServerConfig) {
-        if (server.outboundJson == null || !server.supportedByCore) {
+        val outbound = server.outboundJson
+        if (outbound == null || !server.supportedByCore) {
             VpnState.setError("Этот сервер не поддерживается ядром (${server.transport})")
             VpnState.setStatus(VpnStatus.ERROR)
             return
         }
-        val config = BoxConfigBuilder.build(server)
+        // The service loads AppSettings and builds the final config on its worker thread.
         val intent = Intent(context, InkVpnService::class.java).apply {
             action = InkVpnService.ACTION_START
-            putExtra(InkVpnService.EXTRA_CONFIG, config)
+            putExtra(InkVpnService.EXTRA_OUTBOUND, outbound)
             putExtra(InkVpnService.EXTRA_SERVER_ID, server.id)
         }
         context.startForegroundService(intent)
