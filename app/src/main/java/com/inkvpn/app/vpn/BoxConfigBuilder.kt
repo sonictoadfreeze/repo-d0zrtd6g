@@ -50,7 +50,7 @@ object BoxConfigBuilder {
                     put("mtu", 9000)
                     put("auto_route", true)
                     put("strict_route", false)
-                    put("stack", "system")
+                    put("stack", "gvisor")
                     put("sniff", true)
                     put("sniff_override_destination", false)
                 })
