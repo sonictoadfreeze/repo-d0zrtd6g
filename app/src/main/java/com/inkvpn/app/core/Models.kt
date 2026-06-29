@@ -29,6 +29,23 @@ data class ServerConfig(
             "wireguard" -> "WireGuard"
             else -> protocol.uppercase()
         }
+
+    /** Pretty transport label (gRPC, xHTTP, WS, ...) or null for plain TCP. */
+    val displayTransport: String?
+        get() = when (transport?.lowercase()) {
+            null, "", "tcp", "raw" -> null
+            "ws", "websocket" -> "WS"
+            "grpc" -> "gRPC"
+            "xhttp", "splithttp" -> "xHTTP"
+            "httpupgrade" -> "HTTPUpgrade"
+            "http", "h2" -> "HTTP/2"
+            "quic" -> "QUIC"
+            else -> transport.uppercase()
+        }
+
+    /** Protocol plus transport variant, e.g. "VLESS · gRPC". */
+    val displayProtocolFull: String
+        get() = displayTransport?.let { "$displayProtocol · $it" } ?: displayProtocol
 }
 
 /** Parsed subscription metadata coming from HTTP headers and/or body markers. */

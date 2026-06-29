@@ -370,7 +370,7 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
                     if (server?.description != null) Text(server.description, color = InkSubtext, fontSize = 12.sp)
                     else if (server != null) Text("${server.displayProtocol} • •••••", color = InkSubtext, fontSize = 12.sp)
                 }
-                if (server != null) ProtocolBadge(server.displayProtocol)
+                if (server != null) ProtocolBadge(server.displayProtocolFull)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -511,7 +511,7 @@ fun ServerRow(server: ServerConfig, selected: Boolean, active: Boolean, pingMs: 
             Column(horizontalAlignment = Alignment.End) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     PingBadge(pingMs)
-                    ProtocolBadge(if (server.supportedByCore) server.displayProtocol else "${server.displayProtocol}*")
+                    ProtocolBadge(if (server.supportedByCore) server.displayProtocolFull else "${server.displayProtocolFull}*")
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(if (active) "Активен" else "Подключить", color = if (active) InkSuccess else InkSecondary, fontSize = 11.sp, modifier = Modifier.clickable { onConnect() })
