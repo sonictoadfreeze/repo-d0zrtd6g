@@ -211,7 +211,6 @@ fun InkLogo(size: Int) {
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    val accent = LocalAccent.current.primary
     val items = listOf(
         Tab.HOME to Icons.Filled.Home,
         Tab.SERVERS to Icons.Filled.Dns,
@@ -226,15 +225,8 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                 .fillMaxWidth()
                 .height(64.dp)
                 .clip(RoundedCornerShape(28.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            InkSurfaceVariant.copy(alpha = 0.85f),
-                            InkSurface.copy(alpha = 0.85f),
-                        )
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+                .background(Color.Black)
+                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
         ) {
             val itemWidth = maxWidth / items.size
             val pillOffset by animateDpAsState(
@@ -252,8 +244,8 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                     .fillMaxHeight()
                     .padding(horizontal = 8.dp, vertical = 8.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(accent.copy(alpha = 0.18f))
-                    .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(20.dp))
             )
             Row(Modifier.fillMaxWidth().fillMaxHeight()) {
                 items.forEach { (t, icon) ->
@@ -280,7 +272,7 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                         Icon(
                             icon,
                             contentDescription = t.title,
-                            tint = if (selected) accent else InkSubtext,
+                            tint = Color.White,
                             modifier = Modifier
                                 .scale(iconScale)
                                 .graphicsLayer { alpha = contentAlpha }
@@ -288,7 +280,7 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                         AnimatedVisibility(visible = selected) {
                             Text(
                                 t.title,
-                                color = accent,
+                                color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -351,7 +343,7 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
                 Text(info?.profileTitle ?: "InkVPN", color = InkText, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text("Secure. Fast. Invisible.", color = InkSubtext, fontSize = 12.sp)
             }
-            Icon(Icons.Filled.Settings, contentDescription = null, tint = InkSubtext)
+            Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -529,7 +521,7 @@ fun SubscriptionScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Subscripti
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Подписка", color = InkText, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             Row {
-                Icon(Icons.Filled.Add, contentDescription = "add", tint = InkPrimary, modifier = Modifier.clickable { onAdd() })
+                Icon(Icons.Filled.Add, contentDescription = "add", tint = Color.White, modifier = Modifier.clickable { onAdd() })
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -539,7 +531,7 @@ fun SubscriptionScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Subscripti
                     Column {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(sub.name, color = InkText, fontWeight = FontWeight.Bold)
-                            Icon(Icons.Filled.Refresh, contentDescription = "refresh", tint = InkSecondary, modifier = Modifier.size(18.dp).clickable { vm.refresh(sub.id) })
+                            Icon(Icons.Filled.Refresh, contentDescription = "refresh", tint = Color.White, modifier = Modifier.size(18.dp).clickable { vm.refresh(sub.id) })
                         }
                         Text("Серверов: ${sub.servers.size}", color = InkSubtext, fontSize = 12.sp)
                         val total = sub.info.total
