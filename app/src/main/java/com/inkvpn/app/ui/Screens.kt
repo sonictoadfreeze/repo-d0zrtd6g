@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -13,15 +14,19 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,6 +78,7 @@ import com.inkvpn.app.ui.theme.InkPrimary
 import com.inkvpn.app.ui.theme.InkSecondary
 import com.inkvpn.app.ui.theme.InkSubtext
 import com.inkvpn.app.ui.theme.InkSuccess
+import com.inkvpn.app.ui.theme.InkSurface
 import com.inkvpn.app.ui.theme.InkSurfaceVariant
 import com.inkvpn.app.ui.theme.InkText
 import com.inkvpn.app.vpn.VpnStatus
@@ -206,44 +212,89 @@ fun InkLogo(size: Int) {
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
     val accent = LocalAccent.current.primary
-    Row(
-        Modifier.fillMaxWidth().background(InkSurfaceVariant.copy(alpha = 0.6f)).padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceAround
-    ) {
-        val items = listOf(
-            Tab.HOME to Icons.Filled.Home,
-            Tab.SERVERS to Icons.Filled.Dns,
-            Tab.SUBS to Icons.Filled.Star,
-            Tab.SETTINGS to Icons.Filled.Settings,
-        )
-        items.forEach { (t, icon) ->
-            val selected = t == current
-            val tabScale by animateFloatAsState(
-                targetValue = if (selected) 1.1f else 1f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                label = "tab_${t.name}"
-            )
-            val iconAlpha by animateFloatAsState(
-                targetValue = if (selected) 1f else 0.55f,
-                animationSpec = tween(200),
-                label = "tab_alpha_${t.name}"
-            )
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clickable { onSelect(t) }
-                    .padding(horizontal = 8.dp)
-                    .graphicsLayer { scaleX = tabScale; scaleY = tabScale; alpha = iconAlpha }
-            ) {
-                Icon(icon, contentDescription = t.title, tint = if (selected) accent else InkSubtext)
-                Text(t.title, color = if (selected) accent else InkSubtext, fontSize = 11.sp)
-                if (selected) {
-                    Spacer(Modifier.height(3.dp))
-                    Box(
-                        Modifier.size(width = 16.dp, height = 2.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(accent)
+    val items = listOf(
+        Tab.HOME to Icons.Filled.Home,
+        Tab.SERVERS to Icons.Filled.Dns,
+        Tab.SUBS to Icons.Filled.Star,
+        Tab.SETTINGS to Icons.Filled.Settings,
+    )
+    val selectedIndex = items.indexOfFirst { it.first == current }.coerceAtLeast(0)
+
+    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            InkSurfaceVariant.copy(alpha = 0.85f),
+                            InkSurface.copy(alpha = 0.85f),
+                        )
                     )
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+        ) {
+            val itemWidth = maxWidth / items.size
+            val pillOffset by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "pill_offset"
+            )
+            Box(
+                Modifier
+                    .offset(x = pillOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(accent.copy(alpha = 0.18f))
+                    .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+            )
+            Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+                items.forEach { (t, icon) ->
+                    val selected = t == current
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (selected) 1.15f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "icon_${t.name}"
+                    )
+                    val contentAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.5f,
+                        animationSpec = tween(200),
+                        label = "alpha_${t.name}"
+                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onSelect(t) }
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription = t.title,
+                            tint = if (selected) accent else InkSubtext,
+                            modifier = Modifier
+                                .scale(iconScale)
+                                .graphicsLayer { alpha = contentAlpha }
+                        )
+                        AnimatedVisibility(visible = selected) {
+                            Text(
+                                t.title,
+                                color = accent,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
