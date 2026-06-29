@@ -368,7 +368,7 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
                 Column(Modifier.weight(1f)) {
                     Text(server?.name ?: "Сервер не выбран", color = InkText, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (server?.description != null) Text(server.description, color = InkSubtext, fontSize = 12.sp)
-                    else if (server != null) Text("${server.displayProtocol} • ${server.server}", color = InkSubtext, fontSize = 12.sp)
+                    else if (server != null) Text("${server.displayProtocol} • •••••", color = InkSubtext, fontSize = 12.sp)
                 }
                 if (server != null) ProtocolBadge(server.displayProtocol)
             }
@@ -506,7 +506,7 @@ fun ServerRow(server: ServerConfig, selected: Boolean, active: Boolean, pingMs: 
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(server.name, color = InkText, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${server.server}:${server.port}", color = InkSubtext, fontSize = 11.sp)
+                Text("•••••:${server.port}", color = InkSubtext, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
