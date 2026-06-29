@@ -8,10 +8,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.inkvpn.app.core.ThemeChoice
 
-// InkVPN palette (dark OLED + cyberpunk)
-val InkBackground = Color(0xFF0A0E1A)
-val InkSurface = Color(0xFF111827)
-val InkSurfaceVariant = Color(0xFF1E293B)
+// InkVPN palette (true-black OLED + cyberpunk)
+val InkBackground = Color(0xFF000000)
+val InkSurface = Color(0xFF0B0B0D)
+val InkSurfaceVariant = Color(0xFF18181B)
 val InkPrimary = Color(0xFF6C63FF)
 val InkSecondary = Color(0xFF00D4FF)
 val InkSuccess = Color(0xFF00FF88)
