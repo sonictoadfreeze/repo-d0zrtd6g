@@ -277,15 +277,7 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                                 .scale(iconScale)
                                 .graphicsLayer { alpha = contentAlpha }
                         )
-                        AnimatedVisibility(visible = selected) {
-                            Text(
-                                t.title,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
+
                     }
                 }
             }
