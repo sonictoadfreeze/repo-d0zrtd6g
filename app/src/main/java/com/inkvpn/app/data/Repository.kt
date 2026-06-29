@@ -60,13 +60,16 @@ class Repository(private val context: Context) {
 
     suspend fun current(): List<Subscription> = subscriptions.first()
 
-    /** Add or update a subscription by URL/deep-link. Fetches and parses it. */
+    /** Add or update a subscription by URL/deep-link. Fetches and parses it. Deduplicates by rawUrl. */
     suspend fun addOrUpdateSubscription(name: String?, urlInput: String, existingId: String? = null): Subscription {
         val rawUrl = DeepLink.extractSubscriptionUrl(urlInput)
         val parsed = fetcher.fetch(rawUrl)
         val title = name?.takeIf { it.isNotBlank() } ?: parsed.info.profileTitle ?: "InkVPN"
+        val list = current().toMutableList()
+        val existingByUrl = list.firstOrNull { it.rawUrl == rawUrl }
+        val resolvedId = existingId ?: existingByUrl?.id ?: UUID.randomUUID().toString()
         val sub = Subscription(
-            id = existingId ?: UUID.randomUUID().toString(),
+            id = resolvedId,
             name = title,
             url = DeepLink.toStoredForm(rawUrl),
             rawUrl = rawUrl,
@@ -74,7 +77,6 @@ class Repository(private val context: Context) {
             info = parsed.info,
             lastUpdated = System.currentTimeMillis(),
         )
-        val list = current().toMutableList()
         val idx = list.indexOfFirst { it.id == sub.id }
         if (idx >= 0) list[idx] = sub.copy(pinned = list[idx].pinned) else list.add(sub)
         saveAll(list)

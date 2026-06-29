@@ -1,18 +1,32 @@
 package com.inkvpn.app.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,12 +55,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,10 +78,12 @@ import com.inkvpn.app.ui.theme.InkPrimary
 import com.inkvpn.app.ui.theme.InkSecondary
 import com.inkvpn.app.ui.theme.InkSubtext
 import com.inkvpn.app.ui.theme.InkSuccess
+import com.inkvpn.app.ui.theme.InkSurface
 import com.inkvpn.app.ui.theme.InkSurfaceVariant
 import com.inkvpn.app.ui.theme.InkText
 import com.inkvpn.app.vpn.VpnStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписка"), SETTINGS("Настройки") }
 
@@ -109,15 +128,25 @@ fun InkVpnApp(vm: MainViewModel, activity: MainActivity) {
                 bottomBar = { BottomNav(tab) { tab = it } }
             ) { pad ->
                 Box(Modifier.padding(pad).fillMaxSize()) {
-                    when (tab) {
-                        Tab.HOME -> HomeScreen(vm, activity)
-                        Tab.SERVERS -> ServersScreen(vm, activity)
-                        Tab.SUBS -> SubscriptionScreen(
-                            vm,
-                            onAdd = { prefillUrl = ""; showAdd = true },
-                            onEdit = { editTarget = it }
-                        )
-                        Tab.SETTINGS -> SettingsScreen(vm, activity)
+                    AnimatedContent(
+                        targetState = tab,
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (slideInHorizontally { fullWidth -> direction * fullWidth / 4 } + fadeIn(tween(250)))
+                                .togetherWith(slideOutHorizontally { fullWidth -> -direction * fullWidth / 4 } + fadeOut(tween(200)))
+                        },
+                        label = "tab_transition"
+                    ) { animatedTab ->
+                        when (animatedTab) {
+                            Tab.HOME -> HomeScreen(vm, activity)
+                            Tab.SERVERS -> ServersScreen(vm, activity)
+                            Tab.SUBS -> SubscriptionScreen(
+                                vm,
+                                onAdd = { prefillUrl = ""; showAdd = true },
+                                onEdit = { editTarget = it }
+                            )
+                            Tab.SETTINGS -> SettingsScreen(vm, activity)
+                        }
                     }
                 }
             }
@@ -182,25 +211,75 @@ fun InkLogo(size: Int) {
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    val accent = LocalAccent.current.primary
-    Row(
-        Modifier.fillMaxWidth().background(InkSurfaceVariant.copy(alpha = 0.6f)).padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceAround
-    ) {
-        val items = listOf(
-            Tab.HOME to Icons.Filled.Home,
-            Tab.SERVERS to Icons.Filled.Dns,
-            Tab.SUBS to Icons.Filled.Star,
-            Tab.SETTINGS to Icons.Filled.Settings,
-        )
-        items.forEach { (t, icon) ->
-            val selected = t == current
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onSelect(t) }.padding(horizontal = 8.dp)
-            ) {
-                Icon(icon, contentDescription = t.title, tint = if (selected) accent else InkSubtext)
-                Text(t.title, color = if (selected) accent else InkSubtext, fontSize = 11.sp)
+    val items = listOf(
+        Tab.HOME to Icons.Filled.Home,
+        Tab.SERVERS to Icons.Filled.Dns,
+        Tab.SUBS to Icons.Filled.Star,
+        Tab.SETTINGS to Icons.Filled.Settings,
+    )
+    val selectedIndex = items.indexOfFirst { it.first == current }.coerceAtLeast(0)
+
+    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(Color.Black)
+                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(28.dp))
+        ) {
+            val itemWidth = maxWidth / items.size
+            val pillOffset by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "pill_offset"
+            )
+            Box(
+                Modifier
+                    .offset(x = pillOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(20.dp))
+            )
+            Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+                items.forEach { (t, icon) ->
+                    val selected = t == current
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (selected) 1.15f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "icon_${t.name}"
+                    )
+                    val contentAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.5f,
+                        animationSpec = tween(200),
+                        label = "alpha_${t.name}"
+                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onSelect(t) }
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription = t.title,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .scale(iconScale)
+                                .graphicsLayer { alpha = contentAlpha }
+                        )
+
+                    }
+                }
             }
         }
     }
@@ -256,7 +335,7 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
                 Text(info?.profileTitle ?: "InkVPN", color = InkText, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text("Secure. Fast. Invisible.", color = InkSubtext, fontSize = 12.sp)
             }
-            Icon(Icons.Filled.Settings, contentDescription = null, tint = InkSubtext)
+            Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -273,9 +352,9 @@ fun HomeScreen(vm: MainViewModel, activity: MainActivity) {
                 Column(Modifier.weight(1f)) {
                     Text(server?.name ?: "Сервер не выбран", color = InkText, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (server?.description != null) Text(server.description, color = InkSubtext, fontSize = 12.sp)
-                    else if (server != null) Text("${server.displayProtocol} • ${server.server}", color = InkSubtext, fontSize = 12.sp)
+                    else if (server != null) Text("${server.displayProtocol} • •••••", color = InkSubtext, fontSize = 12.sp)
                 }
-                if (server != null) ProtocolBadge(server.displayProtocol)
+                if (server != null) ProtocolBadge(server.displayProtocolFull)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -302,21 +381,60 @@ fun PowerButton(status: VpnStatus, onClick: () -> Unit) {
     val connected = status == VpnStatus.CONNECTED
     val connecting = status == VpnStatus.CONNECTING
     val accent = LocalAccent.current
+    val scope = rememberCoroutineScope()
+    val scaleAnim = remember { Animatable(1f) }
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (connected) 0.25f else 0f,
+        animationSpec = tween(600),
+        label = "glow"
+    )
+    val buttonScale by animateFloatAsState(
+        targetValue = if (connecting) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "connect_scale"
+    )
+
     Box(contentAlignment = Alignment.Center) {
         if (connected) PulseRing(size = 200.dp, color = accent.accent)
+        if (glowAlpha > 0f) {
+            Box(
+                Modifier
+                    .size(180.dp)
+                    .clip(CircleShape)
+                    .background(accent.accent.copy(alpha = glowAlpha))
+            )
+        }
         Box(
             Modifier
+                .scale(scaleAnim.value * buttonScale)
                 .size(160.dp)
                 .clip(CircleShape)
                 .background(
                     if (connected) Brush.radialGradient(listOf(accent.accent, accent.secondary))
                     else Brush.radialGradient(listOf(InkSurfaceVariant, InkSurfaceVariant))
                 )
-                .clickable { onClick() },
+                .clickable {
+                    scope.launch {
+                        scaleAnim.animateTo(0.88f, tween(80))
+                        scaleAnim.animateTo(1.05f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                        scaleAnim.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow))
+                    }
+                    onClick()
+                },
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Power, contentDescription = "power", tint = if (connected) Color.White else InkSubtext, modifier = Modifier.size(56.dp))
+                val iconRotation by animateFloatAsState(
+                    targetValue = if (connecting) 360f else 0f,
+                    animationSpec = tween(if (connecting) 1000 else 300),
+                    label = "icon_rotate"
+                )
+                Icon(
+                    Icons.Filled.Power,
+                    contentDescription = "power",
+                    tint = if (connected) Color.White else InkSubtext,
+                    modifier = Modifier.size(56.dp).graphicsLayer { rotationZ = iconRotation }
+                )
                 Text(
                     when {
                         connected -> "Подключено"
@@ -339,6 +457,10 @@ fun ServersScreen(vm: MainViewModel, activity: MainActivity) {
     val activeId by vm.activeServerId.collectAsState()
     val servers = subs.flatMap { it.servers }
 
+    val pings by vm.pings.collectAsState()
+
+    LaunchedEffect(servers) { vm.pingAllServers(servers) }
+
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Серверы", color = InkText, fontWeight = FontWeight.Bold, fontSize = 22.sp)
         Spacer(Modifier.height(12.dp))
@@ -348,6 +470,7 @@ fun ServersScreen(vm: MainViewModel, activity: MainActivity) {
                     server = s,
                     selected = s.id == (selectedId ?: servers.firstOrNull()?.id),
                     active = s.id == activeId,
+                    pingMs = pings[s.id],
                     onClick = { vm.selectServer(s.id) },
                     onConnect = { vm.selectServer(s.id); activity.requestConnect(s) }
                 )
@@ -357,7 +480,7 @@ fun ServersScreen(vm: MainViewModel, activity: MainActivity) {
 }
 
 @Composable
-fun ServerRow(server: ServerConfig, selected: Boolean, active: Boolean, onClick: () -> Unit, onConnect: () -> Unit) {
+fun ServerRow(server: ServerConfig, selected: Boolean, active: Boolean, pingMs: Int? = null, onClick: () -> Unit, onConnect: () -> Unit) {
     GlassCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -367,10 +490,13 @@ fun ServerRow(server: ServerConfig, selected: Boolean, active: Boolean, onClick:
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(server.name, color = InkText, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${server.server}:${server.port}", color = InkSubtext, fontSize = 11.sp)
+                Text("•••••:${server.port}", color = InkSubtext, fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.End) {
-                ProtocolBadge(if (server.supportedByCore) server.displayProtocol else "${server.displayProtocol}*")
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PingBadge(pingMs)
+                    ProtocolBadge(if (server.supportedByCore) server.displayProtocolFull else "${server.displayProtocolFull}*")
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(if (active) "Активен" else "Подключить", color = if (active) InkSuccess else InkSecondary, fontSize = 11.sp, modifier = Modifier.clickable { onConnect() })
             }
@@ -387,7 +513,7 @@ fun SubscriptionScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Subscripti
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Подписка", color = InkText, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             Row {
-                Icon(Icons.Filled.Add, contentDescription = "add", tint = InkPrimary, modifier = Modifier.clickable { onAdd() })
+                Icon(Icons.Filled.Add, contentDescription = "add", tint = Color.White, modifier = Modifier.clickable { onAdd() })
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -397,7 +523,7 @@ fun SubscriptionScreen(vm: MainViewModel, onAdd: () -> Unit, onEdit: (Subscripti
                     Column {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(sub.name, color = InkText, fontWeight = FontWeight.Bold)
-                            Icon(Icons.Filled.Refresh, contentDescription = "refresh", tint = InkSecondary, modifier = Modifier.size(18.dp).clickable { vm.refresh(sub.id) })
+                            Icon(Icons.Filled.Refresh, contentDescription = "refresh", tint = Color.White, modifier = Modifier.size(18.dp).clickable { vm.refresh(sub.id) })
                         }
                         Text("Серверов: ${sub.servers.size}", color = InkSubtext, fontSize = 12.sp)
                         val total = sub.info.total
